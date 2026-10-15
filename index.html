@@ -12,6 +12,8 @@
         input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background-color: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
         #result { margin-top: 15px; font-weight: bold; font-size: 1.1em; color: #28a745; }
+        .info-block { margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; font-size: 0.95em; }
+        .info-block p { margin: 5px 0; }
         .graph-area { display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
         .bar-container { display: flex; align-items: flex-end; height: 150px; width: 100%; border-bottom: 2px solid #333; border-left: 2px solid #333; padding-top: 10px; position: relative; }
         .bar { background-color: rgba(0, 123, 255, 0.5); border: 1px solid #007bff; flex: 1; margin: 0 1px; transition: height 0.3s; }
@@ -20,9 +22,9 @@
 </head>
 <body>
 <div class="container">
-    <h2>🧮 Офлайн Калькулятор</h2>
+    <h2>🧮 Офлайн Калькулятор + Экстремумы</h2>
     <label>Функция f(x):</label>
-    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или x*x + 3">
+    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или x*x - 4*x">
     
     <label>Нижний предел (a):</label>
     <input type="number" id="limitA" value="0">
@@ -30,8 +32,14 @@
     <label>Верхний предел (b):</label>
     <input type="number" id="limitB" value="3">
     
-    <button onclick="calculateIntegral()">Вычислить определенный интеграл</button>
+    <button onclick="calculateIntegral()">Вычислить всё</button>
     <div id="result"></div>
+    
+    <div class="info-block" id="extremaBlock" style="display: none;">
+        <p><strong>Точки минимума:</strong> <span id="minPoints">-</span></p>
+        <p><strong>Точки максимума:</strong> <span id="maxPoints">-</span></p>
+        <p><strong>Наименьшее значение функции:</strong> <span id="absMin">-</span></p>
+    </div>
     
     <div class="graph-area">
         <div class="bar-container" id="chartContainer"></div>
@@ -51,6 +59,49 @@ function evaluateExpression(exprStr, xVal) {
 
     const calc = new Function('x', `return ${formatted};`);
     return calc(xVal);
+}
+
+// Поиск экстремумов функции числовым методом на отрезке [a, b]
+function findExtremaAndAbsoluteMin(exprStr, a, b) {
+    const steps = 1000;
+    const h = (b - a) / steps;
+    let values = [];
+    let xValues = [];
+    
+    for (let i = 0; i <= steps; i++) {
+        let curX = a + i * h;
+        xValues.push(curX);
+        values.push(evaluateExpression(exprStr, curX));
+    }
+    
+    let mins = [];
+    let maxs = [];
+    let absoluteMin = values[0];
+    
+    // Ищем абсолютный минимум на всем массиве
+    for (let i = 1; i < values.length; i++) {
+        if (values[i] < absoluteMin) {
+            absoluteMin = values[i];
+        }
+    }
+    
+    // Ищем локальные точки экстремума (где меняется направление)
+    for (let i = 1; i < values.length - 1; i++) {
+        // Локальный минимум (значение меньше соседей)
+        if (values[i] < values[i-1] && values[i] < values[i+1]) {
+            mins.push(xValues[i].toFixed(2));
+        }
+        // Локальный максимум (значение больше соседей)
+        if (values[i] > values[i-1] && values[i] > values[i+1]) {
+            maxs.push(xValues[i].toFixed(2));
+        }
+    }
+    
+    return {
+        minima: mins.length > 0 ? mins.join('; ') : 'Нет внутри интервала',
+        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет внутри интервала',
+        absMin: absoluteMin.toFixed(4)
+    };
 }
 
 function calculateIntegral() {
@@ -74,11 +125,20 @@ function calculateIntegral() {
         }
         
         document.getElementById('result').style.color = '#28a745';
-        document.getElementById('result').innerText = `Результат: ${integralValue.toFixed(4)}`;
+        document.getElementById('result').innerText = `Интеграл: ${integralValue.toFixed(4)}`;
+        
+        // Расчет и вывод экстремумов
+        const analysis = findExtremaAndAbsoluteMin(exprStr, a, b);
+        document.getElementById('minPoints').innerText = analysis.minima;
+        document.getElementById('maxPoints').innerText = analysis.maxima;
+        document.getElementById('absMin').innerText = analysis.absMin;
+        document.getElementById('extremaBlock').style.display = 'block';
+        
         buildNativeChart(exprStr, a, b);
     } catch (error) {
         document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
+        document.getElementById('extremaBlock').style.display = 'none';
     }
 }
 
