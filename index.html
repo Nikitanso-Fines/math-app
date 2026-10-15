@@ -6,7 +6,6 @@
     <title>Интегралы Офлайн</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007bff">
-    <script src="https://cloudflare.com"></script>
     <script src="https://jsdelivr.net"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }
@@ -21,13 +20,13 @@
 <div class="container">
     <h2>🧮 Офлайн Калькулятор</h2>
     <label>Функция f(x):</label>
-    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 + 2*x">
+    <input type="text" id="functionInput" value="x^2" placeholder="Например: x**2 + 2*x или sin(x)">
     
     <label>Нижний предел (a):</label>
     <input type="number" id="limitA" value="0">
     
     <label>Верхний предел (b):</label>
-    <input type="number" id="limitB" value="2">
+    <input type="number" id="limitB" value="3">
     
     <button onclick="calculateIntegral()">Вычислить определенный интеграл</button>
     <div id="result"></div>
@@ -37,9 +36,24 @@
 <script>
 let myChart = null;
 
-// Регистрация Service Worker для полной работы офлайн
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// Безопасный парсер математических выражений на чистом JS
+function evaluateExpression(exprStr, xVal) {
+    // Приводим функции к стандарту Math в JavaScript
+    let formatted = exprStr.toLowerCase()
+        .replace(/pow/g, 'Math.pow')
+        .replace(/sin/g, 'Math.sin')
+        .replace(/cos/g, 'Math.cos')
+        .replace(/exp/g, 'Math.exp')
+        .replace(/pi/g, 'Math.PI')
+        .replace(/\^/g, '**'); // Автозамена знака ^ на JS-степень **
+
+    // Создаем изолированную функцию для расчета значения x
+    const calc = new Function('x', `return ${formatted};`);
+    return calc(xVal);
 }
 
 function calculateIntegral() {
@@ -48,34 +62,43 @@ function calculateIntegral() {
     const b = parseFloat(document.getElementById('limitB').value);
     
     try {
-        const expr = math.compile(exprStr);
         const steps = 1000;
         const h = (b - a) / steps;
-        let sum = 0.5 * (expr.evaluate({x: a}) + expr.evaluate({x: b}));
+        
+        let sum = 0.5 * (evaluateExpression(exprStr, a) + evaluateExpression(exprStr, b));
         
         for (let i = 1; i < steps; i++) {
-            sum += expr.evaluate({x: a + i * h});
+            sum += evaluateExpression(exprStr, a + i * h);
         }
         const integralValue = sum * h;
         
+        if (isNaN(integralValue) || !isFinite(integralValue)) {
+            throw new Error();
+        }
+        
         document.getElementById('result').innerText = `Результат: ${integralValue.toFixed(4)}`;
-        buildChart(expr, a, b);
+        buildChart(exprStr, a, b);
     } catch (error) {
+        document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
     }
 }
 
-function buildChart(expr, a, b) {
+function buildChart(exprStr, a, b) {
     const ctx = document.getElementById('myChart').getContext('2d');
     const labels = [];
     const data = [];
     const start = a - 1;
     const end = b + 1;
-    for (let x = start; x <= end; x += (end - start) / 50) {
+    
+    for (let x = start; x <= end; x += (end - start) / 40) {
         labels.push(x.toFixed(1));
         try {
-            data.push(expr.evaluate({x: x}));
-        } catch(e) { data.push(0); }
+            let y = evaluateExpression(exprStr, x);
+            data.push(isFinite(y) ? y : 0);
+        } catch(e) { 
+            data.push(0); 
+        }
     }
     
     if (myChart) myChart.destroy();
@@ -88,10 +111,17 @@ function buildChart(expr, a, b) {
                 label: 'f(x)',
                 data: data,
                 borderColor: '#007bff',
-                fill: false
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: true,
+                tension: 0.2
             }]
         },
-        options: { responsive: true }
+        options: { 
+            responsive: true,
+            scales: {
+                y: { beginAtZero: false }
+            }
+        }
     });
 }
 </script>
