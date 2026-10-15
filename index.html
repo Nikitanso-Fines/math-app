@@ -6,21 +6,23 @@
     <title>Интегралы Офлайн</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#007bff">
-    <script src="https://jsdelivr.net"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; color: #333; }
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background-color: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
         #result { margin-top: 15px; font-weight: bold; font-size: 1.1em; color: #28a745; }
-        canvas { margin-top: 20px; }
+        .graph-area { display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+        .bar-container { display: flex; align-items: flex-end; height: 150px; width: 100%; border-bottom: 2px solid #333; border-left: 2px solid #333; padding-top: 10px; position: relative; }
+        .bar { background-color: rgba(0, 123, 255, 0.5); border: 1px solid #007bff; flex: 1; margin: 0 1px; transition: height 0.3s; }
+        .labels { display: flex; justify-content: space-between; width: 100%; margin-top: 5px; font-size: 0.8em; color: #666; }
     </style>
 </head>
 <body>
 <div class="container">
     <h2>🧮 Офлайн Калькулятор</h2>
     <label>Функция f(x):</label>
-    <input type="text" id="functionInput" value="x^2" placeholder="Например: x**2 + 2*x или sin(x)">
+    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или x*x + 3">
     
     <label>Нижний предел (a):</label>
     <input type="number" id="limitA" value="0">
@@ -30,28 +32,27 @@
     
     <button onclick="calculateIntegral()">Вычислить определенный интеграл</button>
     <div id="result"></div>
-    <canvas id="myChart"></canvas>
+    
+    <div class="graph-area">
+        <div class="bar-container" id="chartContainer"></div>
+        <div class="labels" id="chartLabels"></div>
+    </div>
 </div>
 
 <script>
-let myChart = null;
-
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
-// Безопасный парсер математических выражений на чистом JS
 function evaluateExpression(exprStr, xVal) {
-    // Приводим функции к стандарту Math в JavaScript
     let formatted = exprStr.toLowerCase()
         .replace(/pow/g, 'Math.pow')
         .replace(/sin/g, 'Math.sin')
         .replace(/cos/g, 'Math.cos')
         .replace(/exp/g, 'Math.exp')
         .replace(/pi/g, 'Math.PI')
-        .replace(/\^/g, '**'); // Автозамена знака ^ на JS-степень **
+        .replace(/\^/g, '**');
 
-    // Создаем изолированную функцию для расчета значения x
     const calc = new Function('x', `return ${formatted};`);
     return calc(xVal);
 }
@@ -76,53 +77,54 @@ function calculateIntegral() {
             throw new Error();
         }
         
+        document.getElementById('result').style.color = '#28a745';
         document.getElementById('result').innerText = `Результат: ${integralValue.toFixed(4)}`;
-        buildChart(exprStr, a, b);
+        buildNativeChart(exprStr, a, b);
     } catch (error) {
         document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
     }
 }
 
-function buildChart(exprStr, a, b) {
-    const ctx = document.getElementById('myChart').getContext('2d');
-    const labels = [];
-    const data = [];
-    const start = a - 1;
-    const end = b + 1;
+function buildNativeChart(exprStr, a, b) {
+    const container = document.getElementById('chartContainer');
+    const labelsContainer = document.getElementById('chartLabels');
+    container.innerHTML = '';
+    labelsContainer.innerHTML = '';
     
-    for (let x = start; x <= end; x += (end - start) / 40) {
-        labels.push(x.toFixed(1));
+    const pointsCount = 15;
+    const step = (b - a) / (pointsCount - 1);
+    let yValues = [];
+    
+    for (let i = 0; i < pointsCount; i++) {
+        let currentX = a + i * step;
         try {
-            let y = evaluateExpression(exprStr, x);
-            data.push(isFinite(y) ? y : 0);
-        } catch(e) { 
-            data.push(0); 
+            let y = evaluateExpression(exprStr, currentX);
+            yValues.push(isFinite(y) ? y : 0);
+        } catch(e) {
+            yValues.push(0);
         }
     }
     
-    if (myChart) myChart.destroy();
+    const maxY = Math.max(...yValues, 1);
+    const minY = Math.min(...yValues, 0);
+    const range = maxY - minY;
     
-    myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'f(x)',
-                data: data,
-                borderColor: '#007bff',
-                backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                fill: true,
-                tension: 0.2
-            }]
-        },
-        options: { 
-            responsive: true,
-            scales: {
-                y: { beginAtZero: false }
-            }
-        }
+    yValues.forEach((y, index) => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        const heightPercent = ((y - minY) / range) * 100;
+        bar.style.height = `${Math.max(heightPercent, 2)}%`;
+        bar.title = `x: ${(a + index * step).toFixed(2)}, y: ${y.toFixed(2)}`;
+        container.appendChild(bar);
     });
+    
+    const labelStart = document.createElement('span');
+    labelStart.innerText = a.toFixed(1);
+    const labelEnd = document.createElement('span');
+    labelEnd.innerText = b.toFixed(1);
+    labelsContainer.appendChild(labelStart);
+    labelsContainer.appendChild(labelEnd);
 }
 </script>
 </body>
