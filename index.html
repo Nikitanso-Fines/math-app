@@ -22,7 +22,7 @@
 </head>
 <body>
 <div class="container">
-    <h2>🧮 Калькулятор интегралов от Ника Ninso </h2>
+    <h2>🧮 Офлайн Калькулятор (Производная + Интеграл)</h2>
     <label>Функция f(x):</label>
     <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или x*x - 4*x">
     
@@ -32,12 +32,12 @@
     <label>Верхний предел (b):</label>
     <input type="number" id="limitB" value="3">
     
-    <button onclick="calculateIntegral()">Вычислить всё</button>
+    <button onclick="calculateAll()">Вычислить всё</button>
     <div id="result"></div>
     
     <div class="info-block" id="extremaBlock" style="display: none;">
-        <p><strong>Точки минимума:</strong> <span id="minPoints">-</span></p>
-        <p><strong>Точки максимума:</strong> <span id="maxPoints">-</span></p>
+        <p><strong>Точки минимума (через f'(x)=0):</strong> <span id="minPoints">-</span></p>
+        <p><strong>Точки максимума (через f'(x)=0):</strong> <span id="maxPoints">-</span></p>
         <p><strong>Наименьшее значение функции:</strong> <span id="absMin">-</span></p>
     </div>
     
@@ -61,58 +61,65 @@ function evaluateExpression(exprStr, xVal) {
     return calc(xVal);
 }
 
-// Поиск экстремумов функции числовым методом на отрезке [a, b]
-function findExtremaAndAbsoluteMin(exprStr, a, b) {
+// Функция численного вычисления первой производной f'(x)
+function getDerivative(exprStr, xVal) {
+    const dx = 0.00001; // Шаг приращения аргумента
+    let f1 = evaluateExpression(exprStr, xVal + dx);
+    let f0 = evaluateExpression(exprStr, xVal);
+    return (f1 - f0) / dx; // Формула численного дифференцирования
+}
+
+// Поиск экстремумов по теореме Ферма (проверка смены знака производной)
+function findExtremaUsingDerivative(exprStr, a, b) {
     const steps = 1000;
     const h = (b - a) / steps;
-    let values = [];
-    let xValues = [];
-    
-    for (let i = 0; i <= steps; i++) {
-        let curX = a + i * h;
-        xValues.push(curX);
-        values.push(evaluateExpression(exprStr, curX));
-    }
     
     let mins = [];
     let maxs = [];
-    let absoluteMin = values[0];
     
-    // Ищем абсолютный минимум на всем массиве
-    for (let i = 1; i < values.length; i++) {
-        if (values[i] < absoluteMin) {
-            absoluteMin = values[i];
+    // Ищем точки, где производная меняет знак (пересекает ноль)
+    for (let i = 1; i < steps; i++) {
+        let xCurrent = a + i * h;
+        let xPrevious = xCurrent - h;
+        
+        let derivCurrent = getDerivative(exprStr, xCurrent);
+        let derivPrevious = getDerivative(exprStr, xPrevious);
+        
+        // Смена знака производной с минуса на плюс означает ТОЧКУ МИНИМУМА
+        if (derivPrevious < 0 && derivCurrent >= 0) {
+            mins.push(xCurrent.toFixed(2));
+        }
+        // Смена знака производной с плюса на минус означает ТОЧКУ МАКСИМУМА
+        if (derivPrevious > 0 && derivCurrent <= 0) {
+            maxs.push(xCurrent.toFixed(2));
         }
     }
     
-    // Ищем локальные точки экстремума (где меняется направление)
-    for (let i = 1; i < values.length - 1; i++) {
-        // Локальный минимум (значение меньше соседей)
-        if (values[i] < values[i-1] && values[i] < values[i+1]) {
-            mins.push(xValues[i].toFixed(2));
-        }
-        // Локальный максимум (значение больше соседей)
-        if (values[i] > values[i-1] && values[i] > values[i+1]) {
-            maxs.push(xValues[i].toFixed(2));
+    // Поиск абсолютного наименьшего значения на всем интервале (включая концы отрезка)
+    let absoluteMin = evaluateExpression(exprStr, a);
+    for (let i = 0; i <= steps; i++) {
+        let y = evaluateExpression(exprStr, a + i * h);
+        if (y < absoluteMin) {
+            absoluteMin = y;
         }
     }
     
     return {
-        minima: mins.length > 0 ? mins.join('; ') : 'Нет внутри интервала',
-        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет внутри интервала',
+        minima: mins.length > 0 ? mins.join('; ') : 'Нет точек перегиба на интервале',
+        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет точек перегиба на интервале',
         absMin: absoluteMin.toFixed(4)
     };
 }
 
-function calculateIntegral() {
+function calculateAll() {
     const exprStr = document.getElementById('functionInput').value;
     const a = parseFloat(document.getElementById('limitA').value);
     const b = parseFloat(document.getElementById('limitB').value);
     
     try {
+        // Численный интеграл методом трапеций
         const steps = 1000;
         const h = (b - a) / steps;
-        
         let sum = 0.5 * (evaluateExpression(exprStr, a) + evaluateExpression(exprStr, b));
         
         for (let i = 1; i < steps; i++) {
@@ -120,15 +127,13 @@ function calculateIntegral() {
         }
         const integralValue = sum * h;
         
-        if (isNaN(integralValue) || !isFinite(integralValue)) {
-            throw new Error();
-        }
+        if (isNaN(integralValue) || !isFinite(integralValue)) throw new Error();
         
         document.getElementById('result').style.color = '#28a745';
         document.getElementById('result').innerText = `Интеграл: ${integralValue.toFixed(4)}`;
         
-        // Расчет и вывод экстремумов
-        const analysis = findExtremaAndAbsoluteMin(exprStr, a, b);
+        // Математический расчет экстремумов по ПРOИЗВОДНОЙ
+        const analysis = findExtremaUsingDerivative(exprStr, a, b);
         document.getElementById('minPoints').innerText = analysis.minima;
         document.getElementById('maxPoints').innerText = analysis.maxima;
         document.getElementById('absMin').innerText = analysis.absMin;
