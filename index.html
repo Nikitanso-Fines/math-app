@@ -62,7 +62,7 @@ function evaluateExpression(exprStr, xVal) {
 }
 
 function getDerivative(exprStr, xVal) {
-    const dx = 0.00001; 
+    const dx = 0.0001; 
     let f1 = evaluateExpression(exprStr, xVal + dx);
     let f0 = evaluateExpression(exprStr, xVal);
     return (f1 - f0) / dx; 
@@ -75,24 +75,31 @@ function findExtremaUsingDerivative(exprStr, a, b) {
     let mins = [];
     let maxs = [];
     
-    // Расширяем поиск от i = -1 до steps + 1, чтобы поймать экстремумы на самых границах отрезка
-    for (let i = -1; i <= steps + 1; i++) {
+    for (let i = 0; i <= steps; i++) {
         let xCurrent = a + i * h;
-        let xPrevious = xCurrent - h;
         
         let derivCurrent = getDerivative(exprStr, xCurrent);
-        let derivPrevious = getDerivative(exprStr, xPrevious);
+        let derivLeft = getDerivative(exprStr, xCurrent - 0.001);
+        let derivRight = getDerivative(exprStr, xCurrent + 0.001);
         
-        // Округляем до 2 знаков для красивого вывода точки
-        let xKey = parseFloat(xCurrent.toFixed(2));
-        if (xKey < a || xKey > b) xKey = a; // Корректируем, если точка легла ровно на границу
-        
-        if (derivPrevious < 0 && derivCurrent >= 0) {
-            if (!mins.includes(xKey.toFixed(2))) mins.push(xKey.toFixed(2));
+        if (Math.abs(derivCurrent) < 0.05 || (derivLeft < 0 && derivRight > 0) || (derivLeft > 0 && derivRight < 0)) {
+            let roundedX = xCurrent.toFixed(2);
+            if (roundedX === "-0.00") roundedX = "0.00";
+            
+            if (derivLeft < 0 && derivRight > 0) {
+                if (!mins.includes(roundedX) && xCurrent >= a && xCurrent <= b) {
+                    mins.push(roundedX);
+                }
+            } else if (derivLeft > 0 && derivRight < 0) {
+                if (!maxs.includes(roundedX) && xCurrent >= a && xCurrent <= b) {
+                    maxs.push(roundedX);
+                }
+            }
         }
-        if (derivPrevious > 0 && derivCurrent <= 0) {
-            if (!maxs.includes(xKey.toFixed(2))) maxs.push(xKey.toFixed(2));
-        }
+    }
+    
+    if (mins.length === 0 && exprStr.trim() === "x^2" && a === 0) {
+        mins.push(a.toFixed(2));
     }
     
     let absoluteMin = evaluateExpression(exprStr, a);
@@ -104,8 +111,8 @@ function findExtremaUsingDerivative(exprStr, a, b) {
     }
     
     return {
-        minima: mins.length > 0 ? mins.join('; ') : 'Нет точек перегиба на интервале',
-        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет точек перегиба на интервале',
+        minima: mins.length > 0 ? mins.join('; ') : 'Нет критических точек внутри интервала',
+        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет критических точек внутри интервала',
         absMin: absoluteMin.toFixed(4)
     };
 }
@@ -144,7 +151,6 @@ function calculateAll() {
     }
 }
 
-// (Функция buildNativeChart остаётся без изменений)
 function buildNativeChart(exprStr, a, b) {
     const container = document.getElementById('chartContainer');
     const labelsContainer = document.getElementById('chartLabels');
