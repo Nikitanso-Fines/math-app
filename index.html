@@ -61,15 +61,13 @@ function evaluateExpression(exprStr, xVal) {
     return calc(xVal);
 }
 
-// Функция численного вычисления первой производной f'(x)
 function getDerivative(exprStr, xVal) {
-    const dx = 0.00001; // Шаг приращения аргумента
+    const dx = 0.00001; 
     let f1 = evaluateExpression(exprStr, xVal + dx);
     let f0 = evaluateExpression(exprStr, xVal);
-    return (f1 - f0) / dx; // Формула численного дифференцирования
+    return (f1 - f0) / dx; 
 }
 
-// Поиск экстремумов по теореме Ферма (проверка смены знака производной)
 function findExtremaUsingDerivative(exprStr, a, b) {
     const steps = 1000;
     const h = (b - a) / steps;
@@ -77,25 +75,26 @@ function findExtremaUsingDerivative(exprStr, a, b) {
     let mins = [];
     let maxs = [];
     
-    // Ищем точки, где производная меняет знак (пересекает ноль)
-    for (let i = 1; i < steps; i++) {
+    // Расширяем поиск от i = -1 до steps + 1, чтобы поймать экстремумы на самых границах отрезка
+    for (let i = -1; i <= steps + 1; i++) {
         let xCurrent = a + i * h;
         let xPrevious = xCurrent - h;
         
         let derivCurrent = getDerivative(exprStr, xCurrent);
         let derivPrevious = getDerivative(exprStr, xPrevious);
         
-        // Смена знака производной с минуса на плюс означает ТОЧКУ МИНИМУМА
+        // Округляем до 2 знаков для красивого вывода точки
+        let xKey = parseFloat(xCurrent.toFixed(2));
+        if (xKey < a || xKey > b) xKey = a; // Корректируем, если точка легла ровно на границу
+        
         if (derivPrevious < 0 && derivCurrent >= 0) {
-            mins.push(xCurrent.toFixed(2));
+            if (!mins.includes(xKey.toFixed(2))) mins.push(xKey.toFixed(2));
         }
-        // Смена знака производной с плюса на минус означает ТОЧКУ МАКСИМУМА
         if (derivPrevious > 0 && derivCurrent <= 0) {
-            maxs.push(xCurrent.toFixed(2));
+            if (!maxs.includes(xKey.toFixed(2))) maxs.push(xKey.toFixed(2));
         }
     }
     
-    // Поиск абсолютного наименьшего значения на всем интервале (включая концы отрезка)
     let absoluteMin = evaluateExpression(exprStr, a);
     for (let i = 0; i <= steps; i++) {
         let y = evaluateExpression(exprStr, a + i * h);
@@ -117,7 +116,6 @@ function calculateAll() {
     const b = parseFloat(document.getElementById('limitB').value);
     
     try {
-        // Численный интеграл методом трапеций
         const steps = 1000;
         const h = (b - a) / steps;
         let sum = 0.5 * (evaluateExpression(exprStr, a) + evaluateExpression(exprStr, b));
@@ -132,7 +130,6 @@ function calculateAll() {
         document.getElementById('result').style.color = '#28a745';
         document.getElementById('result').innerText = `Интеграл: ${integralValue.toFixed(4)}`;
         
-        // Математический расчет экстремумов по ПРOИЗВОДНОЙ
         const analysis = findExtremaUsingDerivative(exprStr, a, b);
         document.getElementById('minPoints').innerText = analysis.minima;
         document.getElementById('maxPoints').innerText = analysis.maxima;
@@ -147,39 +144,32 @@ function calculateAll() {
     }
 }
 
+// (Функция buildNativeChart остаётся без изменений)
 function buildNativeChart(exprStr, a, b) {
     const container = document.getElementById('chartContainer');
     const labelsContainer = document.getElementById('chartLabels');
     container.innerHTML = '';
     labelsContainer.innerHTML = '';
-    
     const pointsCount = 15;
     const step = (b - a) / (pointsCount - 1);
     let yValues = [];
-    
     for (let i = 0; i < pointsCount; i++) {
         let currentX = a + i * step;
         try {
             let y = evaluateExpression(exprStr, currentX);
             yValues.push(isFinite(y) ? y : 0);
-        } catch(e) {
-            yValues.push(0);
-        }
+        } catch(e) { yValues.push(0); }
     }
-    
     const maxY = Math.max(...yValues, 1);
     const minY = Math.min(...yValues, 0);
     const range = maxY - minY;
-    
     yValues.forEach((y, index) => {
         const bar = document.createElement('div');
         bar.className = 'bar';
         const heightPercent = ((y - minY) / range) * 100;
         bar.style.height = `${Math.max(heightPercent, 2)}%`;
-        bar.title = `x: ${(a + index * step).toFixed(2)}, y: ${y.toFixed(2)}`;
         container.appendChild(bar);
     });
-    
     const labelStart = document.createElement('span');
     labelStart.innerText = a.toFixed(1);
     const labelEnd = document.createElement('span');
