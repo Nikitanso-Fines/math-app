@@ -36,8 +36,8 @@
     <div id="result"></div>
     
     <div class="info-block" id="extremaBlock" style="display: none;">
-        <p><strong>Точки минимума (через f'(x)=0):</strong> <span id="minPoints">-</span></p>
-        <p><strong>Точки максимума (через f'(x)=0):</strong> <span id="maxPoints">-</span></p>
+        <p><strong>Точки минимума:</strong> <span id="minPoints">-</span></p>
+        <p><strong>Точки максимума:</strong> <span id="maxPoints">-</span></p>
         <p><strong>Наименьшее значение функции:</strong> <span id="absMin">-</span></p>
     </div>
     
@@ -62,7 +62,7 @@ function evaluateExpression(exprStr, xVal) {
 }
 
 function getDerivative(exprStr, xVal) {
-    const dx = 0.0001; 
+    const dx = 0.00001; 
     let f1 = evaluateExpression(exprStr, xVal + dx);
     let f0 = evaluateExpression(exprStr, xVal);
     return (f1 - f0) / dx; 
@@ -75,33 +75,41 @@ function findExtremaUsingDerivative(exprStr, a, b) {
     let mins = [];
     let maxs = [];
     
-    for (let i = 0; i <= steps; i++) {
+    // 1. Проверяем левую границу отрезка (x = a)
+    let derivA = getDerivative(exprStr, a);
+    if (derivA > 0) {
+        mins.push(a.toFixed(2)); 
+    } else if (derivA < 0) {
+        maxs.push(a.toFixed(2)); 
+    }
+
+    // 2. Проверяем внутренние точки отрезка на смену знака производной
+    for (let i = 1; i < steps; i++) {
         let xCurrent = a + i * h;
+        let xPrevious = xCurrent - h;
         
         let derivCurrent = getDerivative(exprStr, xCurrent);
-        let derivLeft = getDerivative(exprStr, xCurrent - 0.001);
-        let derivRight = getDerivative(exprStr, xCurrent + 0.001);
+        let derivPrevious = getDerivative(exprStr, xPrevious);
         
-        if (Math.abs(derivCurrent) < 0.05 || (derivLeft < 0 && derivRight > 0) || (derivLeft > 0 && derivRight < 0)) {
-            let roundedX = xCurrent.toFixed(2);
-            if (roundedX === "-0.00") roundedX = "0.00";
-            
-            if (derivLeft < 0 && derivRight > 0) {
-                if (!mins.includes(roundedX) && xCurrent >= a && xCurrent <= b) {
-                    mins.push(roundedX);
-                }
-            } else if (derivLeft > 0 && derivRight < 0) {
-                if (!maxs.includes(roundedX) && xCurrent >= a && xCurrent <= b) {
-                    maxs.push(roundedX);
-                }
-            }
+        if (derivPrevious < 0 && derivCurrent >= 0) {
+            let foundX = xCurrent.toFixed(2);
+            if (!mins.includes(foundX)) mins.push(foundX);
+        }
+        if (derivPrevious > 0 && derivCurrent <= 0) {
+            let foundX = xCurrent.toFixed(2);
+            if (!maxs.includes(foundX)) maxs.push(foundX);
         }
     }
-    
-    if (mins.length === 0 && exprStr.trim() === "x^2" && a === 0) {
-        mins.push(a.toFixed(2));
+
+    // 3. Проверяем правую границу отрезка (x = b)
+    let derivB = getDerivative(exprStr, b);
+    if (derivB < 0) {
+        if (!mins.includes(b.toFixed(2))) mins.push(b.toFixed(2));
+    } else if (derivB > 0) {
+        if (!maxs.includes(b.toFixed(2))) maxs.push(b.toFixed(2));
     }
     
+    // Нахождение абсолютного наименьшего значения на отрезке
     let absoluteMin = evaluateExpression(exprStr, a);
     for (let i = 0; i <= steps; i++) {
         let y = evaluateExpression(exprStr, a + i * h);
@@ -111,8 +119,8 @@ function findExtremaUsingDerivative(exprStr, a, b) {
     }
     
     return {
-        minima: mins.length > 0 ? mins.join('; ') : 'Нет критических точек внутри интервала',
-        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет критических точек внутри интервала',
+        minima: mins.length > 0 ? mins.join('; ') : 'Нет экстремумов',
+        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет экстремумов',
         absMin: absoluteMin.toFixed(4)
     };
 }
