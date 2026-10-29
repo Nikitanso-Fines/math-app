@@ -11,35 +11,40 @@
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background-color: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
-        #result { margin-top: 15px; font-weight: bold; font-size: 1.1em; color: #28a745; }
-        .info-block { margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; font-size: 0.95em; }
-        .info-block p { margin: 5px 0; }
+        #result { margin-top: 15px; font-weight: bold; font-size: 1.3em; color: #28a745; text-align: center; }
+        
+        /* Стиль для математической плашки интеграла */
+        .integral-plate { display: flex; align-items: center; justify-content: center; margin: 20px 0; padding: 15px; background-color: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; font-family: 'Courier New', Courier, monospace; font-size: 1.3em; }
+        .integral-sign-container { display: inline-flex; position: relative; font-size: 2.2em; line-height: 1; margin-right: 15px; padding-right: 10px; }
+        .limit-top { position: absolute; top: -0.1em; left: 0.5em; font-size: 0.45em; font-weight: bold; }
+        .limit-bottom { position: absolute; bottom: -0.1em; left: 0.4em; font-size: 0.45em; font-weight: bold; }
+        .minus-sign { color: #dc3545; font-weight: bold; font-size: 1.2em; margin-right: 5px; }
+        
         .graph-area { display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
         .bar-container { display: flex; align-items: flex-end; height: 150px; width: 100%; border-bottom: 2px solid #333; border-left: 2px solid #333; padding-top: 10px; position: relative; }
-        .bar { background-color: rgba(0, 123, 255, 0.5); border: 1px solid #007bff; flex: 1; margin: 0 1px; transition: height 0.3s; }
+        .bar { flex: 1; margin: 0 1px; transition: height 0.3s; }
+        .bar.positive { background-color: rgba(0, 123, 255, 0.5); border: 1px solid #007bff; }
+        .bar.negative { background-color: rgba(220, 53, 69, 0.5); border: 1px solid #dc3545; }
         .labels { display: flex; justify-content: space-between; width: 100%; margin-top: 5px; font-size: 0.8em; color: #666; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>🧮 Офлайн Калькулятор от Ника (ДС-25-ССА)</h2>
+    <h2>🧮 Офлайн Калькулятор Интегралов</h2>
     <label>Функция f(x):</label>
-    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или x*x - 4*x">
+    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или sin(x)">
     
-    <label> (a):</label>
+    <label>Нижний предел (a):</label>
     <input type="number" id="limitA" value="0">
     
-    <label> (b):</label>
+    <label>Верхний предел (b):</label>
     <input type="number" id="limitB" value="3">
     
-    <button onclick="calculateAll()">Вычислить всё</button>
-    <div id="result"></div>
+    <button onclick="calculateAll()">Вычислить интеграл</button>
     
-    <div class="info-block" id="extremaBlock" style="display: none;">
-        <p><strong>Точки минимума:</strong> <span id="minPoints">-</span></p>
-        <p><strong>Точки максимума:</strong> <span id="maxPoints">-</span></p>
-        <p><strong>Наименьшее значение функции:</strong> <span id="absMin">-</span></p>
-    </div>
+    <div class="integral-plate" id="integralPlateVisual" style="display: none;"></div>
+    
+    <div id="result"></div>
     
     <div class="graph-area">
         <div class="bar-container" id="chartContainer"></div>
@@ -61,70 +66,6 @@ function evaluateExpression(exprStr, xVal) {
     return calc(xVal);
 }
 
-function getDerivative(exprStr, xVal) {
-    const dx = 0.00001; 
-    let f1 = evaluateExpression(exprStr, xVal + dx);
-    let f0 = evaluateExpression(exprStr, xVal);
-    return (f1 - f0) / dx; 
-}
-
-function findExtremaUsingDerivative(exprStr, a, b) {
-    const steps = 1000;
-    const h = (b - a) / steps;
-    
-    let mins = [];
-    let maxs = [];
-    
-    // 1. Проверяем левую границу отрезка (x = a)
-    let derivA = getDerivative(exprStr, a);
-    if (derivA > 0) {
-        mins.push(a.toFixed(2)); 
-    } else if (derivA < 0) {
-        maxs.push(a.toFixed(2)); 
-    }
-
-    // 2. Проверяем внутренние точки отрезка на смену знака производной
-    for (let i = 1; i < steps; i++) {
-        let xCurrent = a + i * h;
-        let xPrevious = xCurrent - h;
-        
-        let derivCurrent = getDerivative(exprStr, xCurrent);
-        let derivPrevious = getDerivative(exprStr, xPrevious);
-        
-        if (derivPrevious < 0 && derivCurrent >= 0) {
-            let foundX = xCurrent.toFixed(2);
-            if (!mins.includes(foundX)) mins.push(foundX);
-        }
-        if (derivPrevious > 0 && derivCurrent <= 0) {
-            let foundX = xCurrent.toFixed(2);
-            if (!maxs.includes(foundX)) maxs.push(foundX);
-        }
-    }
-
-    // 3. Проверяем правую границу отрезка (x = b)
-    let derivB = getDerivative(exprStr, b);
-    if (derivB < 0) {
-        if (!mins.includes(b.toFixed(2))) mins.push(b.toFixed(2));
-    } else if (derivB > 0) {
-        if (!maxs.includes(b.toFixed(2))) maxs.push(b.toFixed(2));
-    }
-    
-    // Нахождение абсолютного наименьшего значения на отрезке
-    let absoluteMin = evaluateExpression(exprStr, a);
-    for (let i = 0; i <= steps; i++) {
-        let y = evaluateExpression(exprStr, a + i * h);
-        if (y < absoluteMin) {
-            absoluteMin = y;
-        }
-    }
-    
-    return {
-        minima: mins.length > 0 ? mins.join('; ') : 'Нет экстремумов',
-        maxima: maxs.length > 0 ? maxs.join('; ') : 'Нет экстремумов',
-        absMin: absoluteMin.toFixed(4)
-    };
-}
-
 function calculateAll() {
     const exprStr = document.getElementById('functionInput').value;
     const a = parseFloat(document.getElementById('limitA').value);
@@ -138,35 +79,50 @@ function calculateAll() {
         for (let i = 1; i < steps; i++) {
             sum += evaluateExpression(exprStr, a + i * h);
         }
-        const integralValue = sum * h;
+        let integralValue = sum * h;
         
         if (isNaN(integralValue) || !isFinite(integralValue)) throw new Error();
         
-        document.getElementById('result').style.color = '#28a745';
-        document.getElementById('result').innerText = `Интеграл: ${integralValue.toFixed(4)}`;
+
+        let midY = evaluateExpression(exprStr, (a + b) / 2);
+        let isNegativeY = midY < 0;
+
+        const plate = document.getElementById('integralPlateVisual');
+        plate.style.display = 'flex';
         
-        const analysis = findExtremaUsingDerivative(exprStr, a, b);
-        document.getElementById('minPoints').innerText = analysis.minima;
-        document.getElementById('maxPoints').innerText = analysis.maxima;
-        document.getElementById('absMin').innerText = analysis.absMin;
-        document.getElementById('extremaBlock').style.display = 'block';
+        let minusHtml = isNegativeY ? '<span class="minus-sign">−</span>' : '';
         
-        buildNativeChart(exprStr, a, b);
+        plate.innerHTML = `
+            ${minusHtml}
+            <span class="integral-sign-container">
+                ∫
+                <span class="limit-top">${b}</span>
+                <span class="limit-bottom">${a}</span>
+            </span>
+            <span>(${exprStr}) dx</span>
+        `;
+        
+        document.getElementById('result').style.color = isNegativeY ? '#dc3545' : '#28a745';
+        document.getElementById('result').innerText = `Значение: ${integralValue.toFixed(4)}`;
+        
+        buildNativeChart(exprStr, a, b, isNegativeY);
     } catch (error) {
         document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
-        document.getElementById('extremaBlock').style.display = 'none';
+        document.getElementById('integralPlateVisual').style.display = 'none';
     }
 }
 
-function buildNativeChart(exprStr, a, b) {
+function buildNativeChart(exprStr, a, b, isNegativeY) {
     const container = document.getElementById('chartContainer');
     const labelsContainer = document.getElementById('chartLabels');
     container.innerHTML = '';
     labelsContainer.innerHTML = '';
+    
     const pointsCount = 15;
     const step = (b - a) / (pointsCount - 1);
     let yValues = [];
+    
     for (let i = 0; i < pointsCount; i++) {
         let currentX = a + i * step;
         try {
@@ -174,16 +130,19 @@ function buildNativeChart(exprStr, a, b) {
             yValues.push(isFinite(y) ? y : 0);
         } catch(e) { yValues.push(0); }
     }
+    
     const maxY = Math.max(...yValues, 1);
     const minY = Math.min(...yValues, 0);
     const range = maxY - minY;
-    yValues.forEach((y, index) => {
+    
+    yValues.forEach((y) => {
         const bar = document.createElement('div');
-        bar.className = 'bar';
+        bar.className = y < 0 ? 'bar negative' : 'bar positive';
         const heightPercent = ((y - minY) / range) * 100;
         bar.style.height = `${Math.max(heightPercent, 2)}%`;
         container.appendChild(bar);
     });
+    
     const labelStart = document.createElement('span');
     labelStart.innerText = a.toFixed(1);
     const labelEnd = document.createElement('span');
