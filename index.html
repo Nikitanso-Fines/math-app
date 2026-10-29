@@ -11,16 +11,14 @@
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background-color: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
-        #result { margin-top: 15px; font-weight: bold; font-size: 1.3em; text-align: center; }
+        #result { margin-top: 15px; font-weight: bold; font-size: 1.4em; text-align: center; }
         
-        /* КРАСИВАЯ СБАЛАНСИРОВАННАЯ ПЛАШКА */
+        /* КРАСИВАЯ МАТЕМАТИЧЕСКАЯ ПЛАШКА */
         .integral-plate { display: flex; align-items: center; justify-content: center; margin: 20px 0; padding: 15px; background-color: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.4em; font-family: "Times New Roman", Times, serif; }
-        .minus-sign { color: #dc3545; font-size: 1.2em; margin-right: 5px; font-family: Arial, sans-serif; }
+        .minus-sign { color: #dc3545; font-size: 1.4em; margin-right: 8px; font-family: Arial, sans-serif; font-weight: bold; }
         
-        /* Знак интеграла и пределы в один аккуратный блок */
         .integral-sign-container { display: inline-flex; position: relative; font-size: 2.2em; line-height: 1; margin-right: 25px; padding-right: 5px; user-select: none; }
         
-        /* Верхний предел */
         .limit-top { 
             position: absolute; 
             top: -0.05em; 
@@ -29,7 +27,6 @@
             font-weight: normal; 
         }
         
-        /* Нижний предел */
         .limit-bottom { 
             position: absolute; 
             bottom: -0.05em; 
@@ -52,17 +49,16 @@
 <div class="container">
     <h2>🧮 Офлайн Калькулятор Интегралов</h2>
     <label>Функция f(x):</label>
-    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или sin(x)">
+    <input type="text" id="functionInput" value="x^3" placeholder="Например: x^2 или sin(x)">
     
-    <label>(a):</label>
-    <input type="number" id="limitA" value="0">
+    <label>Нижний предел (a):</label>
+    <input type="number" id="limitA" value="-3">
     
-    <label>(b):</label>
-    <input type="number" id="limitB" value="3">
+    <label>Верхний предел (b):</label>
+    <input type="number" id="limitB" value="0">
     
-    <button onclick="calculateAll()">Вычислить интеграл</button>
+    <button onclick="calculateAll()">Вычислить площадь / интеграл</button>
     
-    <!-- Математическая плашка интеграла -->
     <div class="integral-plate" id="integralPlateVisual" style="display: none;"></div>
     
     <div id="result"></div>
@@ -104,13 +100,20 @@ function calculateAll() {
         
         if (isNaN(integralValue) || !isFinite(integralValue)) throw new Error();
         
-        // КРИТЕРИЙ ЗНАКА: Минус ставится только если сам результат вычислений отрицательный
-        let isNegativeResult = integralValue < 0;
+        // ОПРЕДЕЛЕНИЕ ЗНАКА ФУНКЦИИ Y НА ПРОМЕЖУТКЕ
+        // Берем три контрольные точки на отрезке, чтобы точно узнать, лежит ли график ниже нуля
+        let yA = evaluateExpression(exprStr, a);
+        let yB = evaluateExpression(exprStr, b);
+        let yMid = evaluateExpression(exprStr, (a + b) / 2);
+        
+        // Если хотя бы средняя точка или концы ниже нуля — значит Y < 0
+        let isNegativeY = yMid < 0 || (yA < 0 && yB <= 0) || (yA >= 0 && yB < 0);
 
         const plate = document.getElementById('integralPlateVisual');
         plate.style.display = 'flex';
         
-        let minusHtml = isNegativeResult ? '<span class="minus-sign">−</span>' : '';
+        // Если Y меньше нуля, принудительно выводим КРАСНЫЙ МИНУС перед интегралом
+        let minusHtml = isNegativeY ? '<span class="minus-sign">−</span>' : '';
         
         plate.innerHTML = `
             ${minusHtml}
@@ -122,12 +125,14 @@ function calculateAll() {
             <span class="function-text">(${exprStr}) dx</span>
         `;
         
-        // Меняем цвет текста вывода результата
-        const resultBlock = document.getElementById('result');
-        resultBlock.style.color = isNegativeResult ? '#dc3545' : '#28a745';
-        resultBlock.innerText = `Ответ: ${integralValue.toFixed(4)}`;
+        // ВЫВОД ОТВЕТА: Если Y < 0, берем значение по модулю (делаем положительным), как просила преподаватель
+        let finalDisplayValue = isNegativeY ? Math.abs(integralValue) : integralValue;
         
-        buildNativeChart(exprStr, a, b, isNegativeResult);
+        const resultBlock = document.getElementById('result');
+        resultBlock.style.color = '#28a745'; // Зеленый цвет для правильного ответа площади
+        resultBlock.innerText = `Ответ (Площадь): ${Math.abs(finalDisplayValue).toFixed(4)}`;
+        
+        buildNativeChart(exprStr, a, b, isNegativeY);
     } catch (error) {
         document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
@@ -135,7 +140,7 @@ function calculateAll() {
     }
 }
 
-function buildNativeChart(exprStr, a, b, isNegativeResult) {
+function buildNativeChart(exprStr, a, b, isNegativeY) {
     const container = document.getElementById('chartContainer');
     const labelsContainer = document.getElementById('chartLabels');
     container.innerHTML = '';
