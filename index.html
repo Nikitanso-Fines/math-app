@@ -17,23 +17,8 @@
         .minus-sign { color: #dc3545; font-size: 1.4em; margin-right: 5px; font-family: Arial, sans-serif; }
         
         .integral-sign-container { display: inline-flex; position: relative; font-size: 2.2em; line-height: 1; margin-right: 25px; padding-right: 5px; user-select: none; }
-        
-        .limit-top { 
-            position: absolute; 
-            top: -0.05em; 
-            left: 0.55em; 
-            font-size: 0.45em; 
-            font-weight: normal; 
-        }
-        
-        .limit-bottom { 
-            position: absolute; 
-            bottom: -0.05em; 
-            left: 0.45em; 
-            font-size: 0.45em; 
-            font-weight: normal; 
-        }
-        
+        .limit-top { position: absolute; top: -0.05em; left: 0.55em; font-size: 0.45em; font-weight: normal; }
+        .limit-bottom { position: absolute; bottom: -0.05em; left: 0.45em; font-size: 0.45em; font-weight: normal; }
         .function-text { font-size: 1.1em; margin-left: 2px; }
         
         .graph-area { display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
@@ -46,12 +31,12 @@
 </head>
 <body>
 <div class="container">
-    <h2>🧮 Офлайн Калькулятор Интегралов от Ника из ДС-25-ССА</h2>
+    <h2>🧮 Офлайн Калькулятор Интегралов</h2>
     <label>Функция f(x):</label>
-    <input type="text" id="functionInput" value="x^2" placeholder="Например: x^2 или sin(x)">
+    <input type="text" id="functionInput" value="x^3" placeholder="Например: x^2 или sin(x)">
     
     <label>Нижний предел (a):</label>
-    <input type="number" id="limitA" value="0">
+    <input type="number" id="limitA" value="-3">
     
     <label>Верхний предел (b):</label>
     <input type="number" id="limitB" value="3">
@@ -90,24 +75,32 @@ function calculateAll() {
     try {
         const steps = 1000;
         const h = (b - a) / steps;
-        let sum = 0.5 * (evaluateExpression(exprStr, a) + evaluateExpression(exprStr, b));
         
-        for (let i = 1; i < steps; i++) {
-            sum += evaluateExpression(exprStr, a + i * h);
-        }
-        let integralValue = sum * h;
-        
-        if (isNaN(integralValue) || !isFinite(integralValue)) throw new Error();
-        
-        let yA = evaluateExpression(exprStr, a);
-        let yB = evaluateExpression(exprStr, b);
-        let yMid = evaluateExpression(exprStr, (a + b) / 2);
-        let isNegativeY = yMid < 0 || (yA < 0 && yB <= 0) || (yA >= 0 && yB < 0);
+        let totalSum = 0;
+        let hasNegativeY = false;
 
+        for (let i = 0; i < steps; i++) {
+            let x1 = a + i * h;
+            let x2 = a + (i + 1) * h;
+            
+            let y1 = evaluateExpression(exprStr, x1);
+            let y2 = evaluateExpression(exprStr, x2);
+            
+            let currentY = (y1 + y2) / 2;
+            let area = currentY * h;
+            
+            if (currentY < 0) {
+                hasNegativeY = true;
+                totalSum += (-1) * area;
+            } else {
+                totalSum += area;
+            }
+        }
+        
         const plate = document.getElementById('integralPlateVisual');
         plate.style.display = 'flex';
         
-        let minusHtml = isNegativeY ? '<span class="minus-sign">−</span>' : '';
+        let minusHtml = hasNegativeY ? '<span class="minus-sign">−</span>' : '';
         
         plate.innerHTML = `
             ${minusHtml}
@@ -121,9 +114,9 @@ function calculateAll() {
         
         const resultBlock = document.getElementById('result');
         resultBlock.style.color = '#28a745';
-        resultBlock.innerText = `Интеграл: ${integralValue.toFixed(4)}`;
+        resultBlock.innerText = `Интеграл: ${totalSum.toFixed(4)}`;
         
-        buildNativeChart(exprStr, a, b, isNegativeY);
+        buildNativeChart(exprStr, a, b);
     } catch (error) {
         document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
@@ -131,7 +124,7 @@ function calculateAll() {
     }
 }
 
-function buildNativeChart(exprStr, a, b, isNegativeY) {
+function buildNativeChart(exprStr, a, b) {
     const container = document.getElementById('chartContainer');
     const labelsContainer = document.getElementById('chartLabels');
     container.innerHTML = '';
