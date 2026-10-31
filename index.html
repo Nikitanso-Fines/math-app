@@ -11,15 +11,19 @@
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
         button { background-color: #007bff; color: white; font-weight: bold; border: none; cursor: pointer; }
-        #result { margin-top: 15px; font-weight: bold; font-size: 1.3em; text-align: center; }
         
         .integral-plate { display: flex; align-items: center; justify-content: center; margin: 20px 0; padding: 15px; background-color: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1.4em; font-family: "Times New Roman", Times, serif; }
         .minus-sign { color: #dc3545; font-size: 1.4em; margin-right: 5px; font-family: Arial, sans-serif; }
-        
         .integral-sign-container { display: inline-flex; position: relative; font-size: 2.2em; line-height: 1; margin-right: 25px; padding-right: 5px; user-select: none; }
         .limit-top { position: absolute; top: -0.05em; left: 0.55em; font-size: 0.45em; font-weight: normal; }
         .limit-bottom { position: absolute; bottom: -0.05em; left: 0.45em; font-size: 0.45em; font-weight: normal; }
         .function-text { font-size: 1.1em; margin-left: 2px; }
+
+        /* ВЕРСТКА ВЫВОДА РЕЗУЛЬТАТА И ДРОБИ */
+        .result-wrapper { display: flex; align-items: center; justify-content: center; margin-top: 15px; font-weight: bold; font-size: 1.3em; color: #28a745; }
+        .math-fraction { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; font-size: 0.85em; margin-left: 10px; line-height: 1.1; font-family: "Times New Roman", Times, serif; }
+        .fraction-numerator { border-bottom: 2px solid #28a745; padding: 0 5px; padding-bottom: 2px; }
+        .fraction-denominator { padding: 0 5px; padding-top: 2px; }
         
         .graph-area { margin-top: 20px; width: 100%; display: flex; flex-direction: column; align-items: center; }
         .svg-container { width: 100%; height: 180px; background: #fff; border-bottom: 2px solid #333; border-left: 2px solid #333; position: relative; }
@@ -28,21 +32,21 @@
 </head>
 <body>
 <div class="container">
-    <h2>🧮 Офлайн Калькулятор Интегралов</h2>
+    <h2>🧮 Калькулятор Интегралов от Ника</h2>
     <label>Функция f(x):</label>
     <input type="text" id="functionInput" value="x^3" placeholder="Например: x^2 или sin(x)">
     
-    <label>Нижний предел (a):</label>
+    <label>(a):</label>
     <input type="number" id="limitA" value="-3">
     
-    <label>Верхний предел (b):</label>
+    <label>(b):</label>
     <input type="number" id="limitB" value="3">
     
     <button onclick="calculateAll()">Вычислить интеграл</button>
     
     <div class="integral-plate" id="integralPlateVisual" style="display: none;"></div>
     
-    <div id="result"></div>
+    <div class="result-wrapper" id="resultContainer"></div>
     
     <div class="graph-area">
         <div class="svg-container" id="chartContainer"></div>
@@ -76,7 +80,7 @@ function getGCD(num1, num2) {
 function decimalToBeautifulFraction(val) {
     let roundedValue = Math.round(val * 100) / 100;
     if (Math.abs(roundedValue - Math.round(roundedValue)) < 1e-4) {
-        return Math.round(roundedValue).toString();
+        return { isWhole: true, value: Math.round(roundedValue).toString() };
     }
     
     let denominator = 100;
@@ -86,7 +90,7 @@ function decimalToBeautifulFraction(val) {
     numerator /= commonDivisor;
     denominator /= commonDivisor;
     
-    return numerator + "/" + denominator;
+    return { isWhole: false, num: numerator, den: denominator };
 }
 
 function calculateAll() {
@@ -134,16 +138,25 @@ function calculateAll() {
             <span class="function-text">(${exprStr}) dx</span>
         `;
         
-        const resultBlock = document.getElementById('result');
-        resultBlock.style.color = '#28a745';
+        const resultBlock = document.getElementById('resultContainer');
+        let fractionData = decimalToBeautifulFraction(Math.abs(totalSum));
         
-        let fractionStr = decimalToBeautifulFraction(Math.abs(totalSum));
-        resultBlock.innerText = `Интеграл: ${totalSum.toFixed(2)} (${fractionStr})`;
+        if (fractionData.isWhole) {
+            resultBlock.innerHTML = `<span>Интеграл: ${totalSum.toFixed(2)}</span>`;
+        } else {
+            resultBlock.innerHTML = `
+                <span>Интеграл: ${totalSum.toFixed(2)}</span>
+                <div class="math-fraction">
+                    <span class="fraction-numerator">${fractionData.num}</span>
+                    <span class="fraction-denominator">${fractionData.den}</span>
+                </div>
+            `;
+        }
         
         buildVectorChart(exprStr, a, b);
     } catch (error) {
-        document.getElementById('result').style.color = 'red';
-        document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
+        document.getElementById('resultContainer').style.color = 'red';
+        document.getElementById('resultContainer').innerText = 'Ошибка в формуле или расчетах!';
         document.getElementById('integralPlateVisual').style.display = 'none';
     }
 }
@@ -154,7 +167,7 @@ function buildVectorChart(exprStr, a, b) {
     container.innerHTML = '';
     labelsContainer.innerHTML = '';
     
-    const pointsCount = 50;
+    const pointsCount = 60;
     const step = (b - a) / (pointsCount - 1);
     let points = [];
     
@@ -176,6 +189,25 @@ function buildVectorChart(exprStr, a, b) {
     
     let svgHtml = `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">`;
     
+    // Создаем цветной градиент вдоль линии графика
+    svgHtml += `
+        <defs>
+            <linearGradient id="line-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+    `;
+    
+    let zeroYPercent = ((maxY - 0) / rangeY) * 100;
+    if (zeroYPercent < 0) zeroYPercent = 0;
+    if (zeroYPercent > 100) zeroYPercent = 100;
+    
+    svgHtml += `
+                <stop offset="0%" stop-color="#007bff" />
+                <stop offset="${zeroYPercent}%" stop-color="#007bff" />
+                <stop offset="${zeroYPercent}%" stop-color="#dc3545" />
+                <stop offset="100%" stop-color="#dc3545" />
+            </linearGradient>
+        </defs>
+    `;
+    
     let zeroY = height - ((0 - minY) / rangeY) * height;
     if (zeroY >= 0 && zeroY <= height) {
         svgHtml += `<line x1="0" y1="${zeroY}" x2="${width}" y2="${zeroY}" stroke="#ccc" stroke-width="1" stroke-dasharray="4"/>`;
@@ -192,8 +224,8 @@ function buildVectorChart(exprStr, a, b) {
         }
     });
     
-    svgHtml += `<path d="${pathData}" fill="none" stroke="#007bff" stroke-width="3" />`;
-    svgHtml += `</svg> `;
+    svgHtml += `<path d="${pathData}" fill="none" stroke="url(#line-gradient)" stroke-width="3" />`;
+    svgHtml += `</svg>`;
     
     container.innerHTML = svgHtml;
     
