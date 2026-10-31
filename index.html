@@ -21,11 +21,8 @@
         .limit-bottom { position: absolute; bottom: -0.05em; left: 0.45em; font-size: 0.45em; font-weight: normal; }
         .function-text { font-size: 1.1em; margin-left: 2px; }
         
-        .graph-area { display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
-        .bar-container { display: flex; align-items: flex-end; height: 150px; width: 100%; border-bottom: 2px solid #333; border-left: 2px solid #333; padding-top: 10px; position: relative; }
-        .bar { flex: 1; margin: 0 1px; transition: height 0.3s; }
-        .bar.positive { background-color: rgba(0, 123, 255, 0.5); border: 1px solid #007bff; }
-        .bar.negative { background-color: rgba(220, 53, 69, 0.5); border: 1px solid #dc3545; }
+        .graph-area { margin-top: 20px; width: 100%; display: flex; flex-direction: column; align-items: center; }
+        .svg-container { width: 100%; height: 180px; background: #fff; border-bottom: 2px solid #333; border-left: 2px solid #333; position: relative; }
         .labels { display: flex; justify-content: space-between; width: 100%; margin-top: 5px; font-size: 0.8em; color: #666; font-family: Arial, sans-serif; }
     </style>
 </head>
@@ -35,10 +32,10 @@
     <label>Функция f(x):</label>
     <input type="text" id="functionInput" value="x^3" placeholder="Например: x^2 или sin(x)">
     
-    <label>Нижний предел (a):</label>
+    <label>(a):</label>
     <input type="number" id="limitA" value="-3">
     
-    <label>Верхний предел (b):</label>
+    <label>(b):</label>
     <input type="number" id="limitB" value="3">
     
     <button onclick="calculateAll()">Вычислить интеграл</button>
@@ -48,7 +45,7 @@
     <div id="result"></div>
     
     <div class="graph-area">
-        <div class="bar-container" id="chartContainer"></div>
+        <div class="svg-container" id="chartContainer"></div>
         <div class="labels" id="chartLabels"></div>
     </div>
 </div>
@@ -65,6 +62,22 @@ function evaluateExpression(exprStr, xVal) {
 
     const calc = new Function('x', `return ${formatted};`);
     return calc(xVal);
+}
+
+function decimalToFraction(val) {
+    let tolerance = 1.0e-6;
+    let h1 = 1; let h2 = 0;
+    let k1 = 0; let k2 = 1;
+    let b = val;
+    do {
+        let a = Math.floor(b);
+        let aux = h1; h1 = a * h1 + h2; h2 = aux;
+        aux = k1; k1 = a * k1 + k2; k2 = aux;
+        b = 1 / (b - a);
+    } while (Math.abs(val - h1 / k1) > val * tolerance);
+
+    if (k1 === 1) return h1.toString();
+    return h1 + "/" + k1;
 }
 
 function calculateAll() {
@@ -114,9 +127,11 @@ function calculateAll() {
         
         const resultBlock = document.getElementById('result');
         resultBlock.style.color = '#28a745';
-        resultBlock.innerText = `Интеграл: ${totalSum.toFixed(4)}`;
         
-        buildNativeChart(exprStr, a, b);
+        let fractionStr = decimalToFraction(Math.abs(totalSum));
+        resultBlock.innerText = `Интеграл: ${totalSum.toFixed(4)} (${fractionStr})`;
+        
+        buildVectorChart(exprStr, a, b);
     } catch (error) {
         document.getElementById('result').style.color = 'red';
         document.getElementById('result').innerText = 'Ошибка в формуле или расчетах!';
@@ -124,35 +139,54 @@ function calculateAll() {
     }
 }
 
-function buildNativeChart(exprStr, a, b) {
+function buildVectorChart(exprStr, a, b) {
     const container = document.getElementById('chartContainer');
     const labelsContainer = document.getElementById('chartLabels');
     container.innerHTML = '';
     labelsContainer.innerHTML = '';
     
-    const pointsCount = 15;
+    const pointsCount = 50;
     const step = (b - a) / (pointsCount - 1);
-    let yValues = [];
+    let points = [];
     
     for (let i = 0; i < pointsCount; i++) {
         let currentX = a + i * step;
         try {
             let y = evaluateExpression(exprStr, currentX);
-            yValues.push(isFinite(y) ? y : 0);
-        } catch(e) { yValues.push(0); }
+            points.push({x: i, y: isFinite(y) ? y : 0});
+        } catch(e) { points.push({x: i, y: 0}); }
     }
     
-    const maxY = Math.max(...yValues, 1);
-    const minY = Math.min(...yValues, 0);
-    const range = maxY - minY;
+    let yVals = points.map(p => p.y);
+    let maxY = Math.max(...yVals, 1);
+    let minY = Math.min(...yVals, -1);
+    let rangeY = maxY - minY;
     
-    yValues.forEach((y) => {
-        const bar = document.createElement('div');
-        bar.className = y < 0 ? 'bar negative' : 'bar positive';
-        const heightPercent = ((y - minY) / range) * 100;
-        bar.style.height = `${Math.max(heightPercent, 2)}%`;
-        container.appendChild(bar);
+    let width = container.clientWidth || 460;
+    let height = 180;
+    
+    let svgHtml = `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">`;
+    
+    let zeroY = height - ((0 - minY) / rangeY) * height;
+    if (zeroY >= 0 && zeroY <= height) {
+        svgHtml += `<line x1="0" y1="${zeroY}" x2="${width}" y2="${zeroY}" stroke="#ccc" stroke-width="1" stroke-dasharray="4"/>`;
+    }
+    
+    let pathData = "";
+    points.forEach((p, index) => {
+        let posX = (index / (pointsCount - 1)) * width;
+        let posY = height - ((p.y - minY) / rangeY) * height;
+        if (index === 0) {
+            pathData += `M ${posX} ${posY}`;
+        } else {
+            pathData += ` L ${posX} ${posY}`;
+        }
     });
+    
+    svgHtml += `<path d="${pathData}" fill="none" stroke="#007bff" stroke-width="3" />`;
+    svgHtml += `</svg> `;
+    
+    container.innerHTML = svgHtml;
     
     const labelStart = document.createElement('span');
     labelStart.innerText = a.toFixed(1);
